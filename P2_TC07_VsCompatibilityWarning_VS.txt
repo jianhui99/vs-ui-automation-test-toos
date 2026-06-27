@@ -1,0 +1,25 @@
+Test Case ID: TC07
+Title: VS Compatibility Warning for Newer Framework Project
+Feature: .NET 11 Preview / VS Compatibility (VS)
+Priority: P2
+Classification: Functional
+Client Type: Visual Studio IDE (WinAppDriver)
+
+Test Data:
+  Vs_Older = {Vs_Previous_Version}        # older VS lacking the SDK under test
+  NewerProjectTfm = {Tfm_Default}         # e.g. net11.0 project
+
+Expected Results:
+  - Opening a project targeting a newer framework in an older VS shows a clear
+    compatibility/incompatibility warning (e.g. "requires a newer version of .NET SDK"
+    or a project-load warning), rather than silently failing or crashing
+
+Test Steps:
+  1. Ensure a project targeting NewerProjectTfm exists (create with the SDK under test,
+     or use a prepared sample).
+  2. Launch the OLDER Visual Studio ({Vs_Older}) via WinAppDriver.
+  3. File > Open > Project/Solution; select the newer-framework project.
+  4. Wait for the load to complete or for a warning dialog/notification to appear.
+  5. Assert a compatibility warning is shown (capture its text).
+  6. Assert the warning clearly indicates the framework/SDK is not supported by this VS.
+  7. If no warning appears, fail and flag as a bug candidate. DumpUI on failure.

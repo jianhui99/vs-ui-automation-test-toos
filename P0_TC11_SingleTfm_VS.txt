@@ -1,0 +1,31 @@
+Test Case ID: TC11
+Title: Single TFM Console App via Visual Studio UI
+Feature: Project Creation (VS)
+Priority: P0
+Classification: BVT
+Client Type: Visual Studio IDE (WinAppDriver)
+
+Test Data:
+  Template = "Console App"
+  ProjectName = "SingleTfmConsole"
+  Location = {WorkDir_Root}/TC11
+  ExpectedTfm = {Tfm_Default}            # SDK under test
+
+Expected Results:
+  - VS launches and the New Project dialog opens
+  - Console App project is created via the VS UI
+  - Build succeeds (Build > Build Solution -> "Build succeeded")
+  - App runs successfully (Debug > Start Without Debugging)
+  - Resolved TargetFramework in the generated .csproj matches the SDK under test
+  - If the target framework looks wrong, fail and flag as a bug candidate
+
+Test Steps:
+  1. Launch Visual Studio via WinAppDriver.
+  2. Wait-then-Act: File > New > Project.
+  3. Search the template "Console App"; select it; click Next.
+  4. Enter ProjectName and Location; click Create (disambiguate Create button by ControlType).
+  5. Wait for the solution to finish loading.
+  6. Build > Build Solution; wait for "Build succeeded".
+  7. Debug > Start Without Debugging; confirm the app runs (console window / exit).
+  8. Read TargetFramework from the generated .csproj (MSBuild property).
+  9. Assert it equals ExpectedTfm; if it looks wrong, fail (bug candidate). DumpUI on failure.

@@ -1,0 +1,31 @@
+Test Case ID: TC14
+Title: Multi-TFM Console App via Visual Studio UI
+Feature: Multi-Targeting (VS)
+Priority: P0
+Classification: BVT
+Client Type: Visual Studio IDE (WinAppDriver)
+
+Test Data:
+  Template = "Console App"
+  ProjectName = "MultiTfmConsole"
+  Location = {WorkDir_Root}/TC14
+  TargetFrameworks = [ {Tfm_Default}, {Tfm_DownLevel} ]   # e.g. net11.0 ; net48
+
+Expected Results:
+  - Console App is created via the VS UI
+  - .csproj edited to multi-target (TargetFrameworks, plural)
+  - Build succeeds for all target frameworks
+  - App runs for each target framework
+
+Test Steps:
+  1. Launch Visual Studio via WinAppDriver.
+  2. File > New > Project; create "Console App" (ProjectName, Location); click Create.
+  3. Wait for the solution to load.
+  4. Open the .csproj for edit (double-click project node) and replace
+     <TargetFramework> with <TargetFrameworks>net11.0;net48</TargetFrameworks>.
+  5. Save (Ctrl+S); confirm project reloads without error.
+  6. Build > Build Solution; wait for "Build succeeded" (all TFMs build).
+  7. For each TFM, set it active (debug target dropdown) and Start Without Debugging;
+     confirm the app runs.
+  8. Assert TargetFrameworks property contains both expected TFMs (MSBuild read).
+     DumpUI on any failure.

@@ -1,0 +1,28 @@
+Test Case ID: TC21
+Title: Live Unit Testing (LUT) via Visual Studio UI
+Feature: Unit Testing (VS LUT)
+Priority: P1
+Classification: BVT
+Client Type: Visual Studio IDE (WinAppDriver)
+
+Test Data:
+  ClassLibTemplate = "Class Library"       # .NET Standard / .NET class library
+  TestTemplate = "xUnit Test Project"
+  Location = {WorkDir_Root}/TC21
+
+Expected Results:
+  - Solution builds: a class library + an xUnit test project referencing it
+  - Live Unit Testing can be started and runs continuously
+  - LUT coverage glyphs (pass/fail) appear in the editor as code/tests change
+  - Note: LUT does NOT support F# — only the C#/xUnit project is validated here
+
+Test Steps:
+  1. Launch Visual Studio via WinAppDriver.
+  2. Create a "Class Library" project; add a simple method.
+  3. Add an "xUnit Test Project"; add a project reference to the class library.
+  4. Add a passing test for the library method.
+  5. Build > Build Solution; wait for "Build succeeded".
+  6. Test > Live Unit Testing > Start; wait for LUT to initialize.
+  7. Assert LUT coverage glyphs appear (passing indicators) in the editor gutter.
+  8. Edit the test to fail; confirm LUT updates the glyph to a failing indicator live.
+  9. Test > Live Unit Testing > Stop. DumpUI on any failure.

@@ -1,0 +1,29 @@
+Test Case ID: TC22
+Title: Test Explorer Discovery, Run/Debug, and Result Indicators
+Feature: Unit Testing (VS Test Explorer)
+Priority: P0
+Classification: BVT
+Client Type: Visual Studio IDE (WinAppDriver)
+
+Test Data:
+  TestFrameworks = [ "xUnit", "NUnit", "MSTest" ]
+  Location = {WorkDir_Root}/TC22
+
+Expected Results:
+  - Test discovery auto-triggers after build
+  - Run and Debug work (Run All, Run Selected, Debug)
+  - Pass/fail/skip indicators are shown in the editor gutter
+  - Test Explorer correctly displays passing, failing, and skipped results
+
+Test Steps:
+  1. Launch Visual Studio via WinAppDriver.
+  2. Create a test project for each framework (xUnit / NUnit / MSTest) in one solution.
+  3. Add tests: one passing, one failing, one skipped, per framework.
+  4. Build > Build Solution; wait for "Build succeeded".
+  5. Test > Test Explorer; wait for discovery to settle (Wait-then-Act).
+  6. Assert discovered test count == expected (3 per framework).
+  7. Run All; wait for completion.
+  8. Assert Test Explorer shows correct pass/fail/skip counts.
+  9. Confirm editor gutter shows pass/fail/skip indicators for the methods.
+ 10. Debug a single failing test; confirm debugger breaks/stops as expected.
+     DumpUI on any failure.

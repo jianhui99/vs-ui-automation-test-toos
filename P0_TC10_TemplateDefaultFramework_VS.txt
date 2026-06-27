@@ -1,0 +1,31 @@
+Test Case ID: TC10
+Title: Template Default Target Framework via Visual Studio UI
+Feature: Templates (VS)
+Priority: P0
+Classification: BVT
+Client Type: Visual Studio IDE (WinAppDriver)
+
+Test Data:
+  Templates = [ "Console App", "Class Library", ".NET MAUI App" ]
+  Location = {WorkDir_Root}/TC10
+
+Expected Results:
+  - New Project dialog's framework dropdown defaults to the latest LTS
+  - If no LTS is available, it falls back to the highest non-preview framework
+  - Behavior is consistent across Console App, Class Library, and MAUI App
+  - After creating projects with a newer SDK, the default framework updates accordingly
+
+Test Steps:
+  1. Launch Visual Studio via WinAppDriver.
+  2. For each template in Templates:
+       a. File > New > Project; search and select the template; click Next.
+       b. On the configuration page, read the "Framework" dropdown's selected value.
+       c. Assert the default == latest LTS (or highest non-preview if no LTS present).
+       d. Cancel / complete creation as needed.
+  3. Record the default framework observed per template in the result report.
+  4. Assert defaults are consistent with the SDK-under-test policy; flag mismatches as
+     bug candidates. DumpUI on failure.
+
+Notes:
+  Use the Framework dropdown's selected item (UI value), cross-checked against the
+  generated .csproj TargetFramework where a project is created.
