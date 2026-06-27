@@ -9,6 +9,14 @@ Test Data:
   TestFrameworks = [ "xUnit", "NUnit", "MSTest" ]
   Location = {WorkDir_Root}/TC22
 
+Create a .NetStandard Class library with a referenced test project( Test all the 3 test frameworks - Xunit, Nunit, Mstest). Add a passing, failing and inconclusive test.  
+
+  
+
+1.Ensure that Test Discovery automatically triggers. 
+2. Ensure that Run All/ Run from context and Run Selected tests work. Perform the same for Debug. 
+1.Ensure that Test Indicators show up in the editor on build. 
+
 Expected Results:
   - Test discovery auto-triggers after build
   - Run and Debug work (Run All, Run Selected, Debug)
