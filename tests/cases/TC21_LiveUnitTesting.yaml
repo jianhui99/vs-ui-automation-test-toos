@@ -1,0 +1,139 @@
+id: TC21
+title: Live Unit Testing with xUnit
+priority: P1
+feature: Live Unit Testing
+classification: Regression
+tags: [live-unit-testing, lut, xunit, netstandard]
+
+targets:
+  arch: [x64, arm64]
+  vs: ["18.0"]
+
+data:
+  workDir: "${WorkDir_Root}/TC21"
+  libProjectName: "Tc21ClassLib"
+  xunitProjectName: "Tc21XUnitTests"
+
+config:
+  onFailure: stop
+  timeoutSeconds: 1200
+  retries: 1
+
+steps:
+  - action: launch_vs
+    name: Launch Visual Studio
+    with:
+      version: "${targets.vs[0]}"
+      cleanInstance: true
+
+  - action: new_project
+    name: Create .NET Standard Class Library
+    with:
+      template: "Class Library"
+      name: "${data.libProjectName}"
+      location: "${data.workDir}"
+      targetFramework: "netstandard2.0"
+
+  - action: edit_file
+    name: Add a simple calculator class to the library
+    with:
+      path: "${data.workDir}/${data.libProjectName}/Calculator.cs"
+      content: |
+        namespace Tc21ClassLib;
+        public class Calculator
+        {
+            public int Add(int a, int b) => a + b;
+        }
+
+  - action: new_project
+    name: Add xUnit test project
+    with:
+      template: "xUnit Test Project"
+      name: "${data.xunitProjectName}"
+      location: "${data.workDir}"
+      addToSolution: true
+      addProjectReference: "${data.libProjectName}"
+
+  - action: edit_file
+    name: Add xUnit tests for Calculator
+    with:
+      path: "${data.workDir}/${data.xunitProjectName}/CalculatorTests.cs"
+      content: |
+        using Tc21ClassLib;
+        using Xunit;
+        public class CalculatorTests
+        {
+            [Fact] public void Add_TwoPositives_ReturnsSum() =>
+                Assert.Equal(3, new Calculator().Add(1, 2));
+            [Fact] public void Add_NegativeAndPositive_ReturnsSum() =>
+                Assert.Equal(-1, new Calculator().Add(-3, 2));
+        }
+
+  - action: build
+    name: Build solution before enabling LUT
+    with:
+      configuration: Debug
+    assert:
+      - type: build_succeeded
+
+  - action: set_option
+    name: Enable Live Unit Testing
+    with:
+      menu: "Test"
+      submenu: "Live Unit Testing"
+      item: "Start"
+
+  - action: wait_for
+    name: Wait for LUT to initialize and run first pass
+    with:
+      seconds: 30
+    assert:
+      - type: ai_visual
+        advisory: false
+        prompt: >
+          Confirm that Live Unit Testing has started and the editor shows coverage
+          indicators (green check marks or blue dashes) in the gutter next to test-covered
+          lines in CalculatorTests.cs and Calculator.cs.
+          Report if no indicators appear after 30 seconds as a failure.
+
+  - action: screenshot
+    name: Capture LUT indicators in editor
+    with:
+      label: tc21-lut-indicators
+
+  - action: edit_file
+    name: Introduce a failing test by changing expected value
+    with:
+      path: "${data.workDir}/${data.xunitProjectName}/CalculatorTests.cs"
+      replace:
+        old: "Assert.Equal(3, new Calculator().Add(1, 2));"
+        new: "Assert.Equal(99, new Calculator().Add(1, 2));"
+
+  - action: wait_for
+    name: Wait for LUT to detect and report the failing test
+    with:
+      seconds: 20
+    assert:
+      - type: ai_visual
+        advisory: false
+        prompt: >
+          Confirm that after the code edit, Live Unit Testing updated the gutter
+          indicators and shows a red X next to the failing test.
+          Report if the indicator does not change within 20 seconds as a failure.
+
+  - action: screenshot
+    name: Capture LUT failure indicator
+    with:
+      label: tc21-lut-failure
+
+  - action: wait_for
+    name: AI advisory — overall LUT health check
+    with:
+      seconds: 1
+    assert:
+      - type: ai_visual
+        advisory: true
+        prompt: >
+          Confirm that Live Unit Testing is actively running and its status bar
+          indicator shows it is healthy (not paused, stopped, or in error state).
+          Flag any anomaly as a bug candidate.

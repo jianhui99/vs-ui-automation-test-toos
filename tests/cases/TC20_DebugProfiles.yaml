@@ -1,0 +1,119 @@
+id: TC20
+title: Debug Profile Creation and launchSettings.json Synchronization
+priority: P2
+feature: Debug Profiles
+classification: Regression
+tags: [debug-profile, launch-settings, launchSettings.json, sync]
+
+targets:
+  arch: [x64, arm64]
+  vs: ["18.0"]
+
+data:
+  workDir: "${WorkDir_Root}/TC20"
+  projectName: "Tc20DebugProfileApp"
+  launchSettingsPath: "${data.workDir}/${data.projectName}/Properties/launchSettings.json"
+  newProfileName: "MyCustomProfile"
+  envVarKey: "MY_ENV_VAR"
+  envVarValue: "hello_from_tc20"
+  commandLineArgs: "--verbose"
+
+config:
+  onFailure: stop
+  timeoutSeconds: 600
+  retries: 1
+
+steps:
+  - action: launch_vs
+    name: Launch Visual Studio
+    with:
+      version: "${targets.vs[0]}"
+      cleanInstance: true
+
+  - action: new_project
+    name: Create a Console Application
+    with:
+      template: "Console App"
+      name: "${data.projectName}"
+      location: "${data.workDir}"
+
+  - action: set_option
+    name: Open Debug Launch Profiles dialog
+    with:
+      menu: "Debug"
+      submenu: "Debug Properties"
+
+  - action: set_option
+    name: Add a new Debug Profile
+    with:
+      dialog: "Launch Profiles"
+      action: "add_profile"
+      profileName: "${data.newProfileName}"
+
+  - action: set_option
+    name: Set command-line arguments on the new profile
+    with:
+      dialog: "Launch Profiles"
+      profile: "${data.newProfileName}"
+      field: "commandLineArgs"
+      value: "${data.commandLineArgs}"
+
+  - action: set_option
+    name: Add an environment variable to the new profile
+    with:
+      dialog: "Launch Profiles"
+      profile: "${data.newProfileName}"
+      field: "environmentVariables"
+      key: "${data.envVarKey}"
+      value: "${data.envVarValue}"
+
+  - action: set_option
+    name: Save and close the Launch Profiles dialog
+    with:
+      dialog: "Launch Profiles"
+      action: "save_and_close"
+
+  - action: wait_for
+    name: Allow VS to flush changes to launchSettings.json
+    with:
+      seconds: 3
+
+  - action: screenshot
+    name: Capture IDE state after saving profile
+    with:
+      label: tc20-after-save
+
+  # Ground-truth assertions: read the file rather than trusting UI.
+  - action: wait_for
+    name: Verify launchSettings.json contains the new profile
+    with:
+      seconds: 1
+    assert:
+      - type: file_exists
+        path: "${data.launchSettingsPath}"
+      - type: file_contains
+        path: "${data.launchSettingsPath}"
+        value: "${data.newProfileName}"
+      - type: file_contains
+        path: "${data.launchSettingsPath}"
+        value: "${data.commandLineArgs}"
+      - type: file_contains
+        path: "${data.launchSettingsPath}"
+        value: "${data.envVarKey}"
+      - type: file_contains
+        path: "${data.launchSettingsPath}"
+        value: "${data.envVarValue}"
+
+  - action: wait_for
+    name: AI advisory — validate launchSettings.json structure
+    with:
+      seconds: 1
+    assert:
+      - type: ai_visual
+        advisory: true
+        prompt: >
+          Read the launchSettings.json file and confirm it is valid JSON containing
+          a profile named "${data.newProfileName}" with commandLineArgs set to
+          "${data.commandLineArgs}" and an environment variable "${data.envVarKey}"
+          set to "${data.envVarValue}". Flag any missing field or malformed JSON as
+          a bug candidate.

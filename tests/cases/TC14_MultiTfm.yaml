@@ -1,0 +1,110 @@
+id: TC14
+title: Multi-TFM Console Application
+priority: P0
+feature: Multi Target Framework
+classification: BVT
+tags: [console, multi-tfm, build, run, net48]
+
+targets:
+  arch: [x64, arm64]
+  vs: ["18.0"]
+
+data:
+  workDir: "${WorkDir_Root}/TC14"
+  template: "Console App"
+  projectName: "Tc14MultiTfmApp"
+  csprojPath: "${data.workDir}/${data.projectName}/${data.projectName}.csproj"
+  programCsPath: "${data.workDir}/${data.projectName}/Program.cs"
+
+config:
+  onFailure: stop
+  timeoutSeconds: 1200
+  retries: 1
+
+steps:
+  - action: launch_vs
+    name: Launch Visual Studio
+    with:
+      version: "${targets.vs[0]}"
+      cleanInstance: true
+
+  - action: new_project
+    name: Create a .NET Console Application
+    with:
+      template: "${data.template}"
+      name: "${data.projectName}"
+      location: "${data.workDir}"
+
+  - action: replace_file
+    name: Replace csproj with multi-TFM project file
+    with:
+      path: "${data.csprojPath}"
+      content: |
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <OutputType>Exe</OutputType>
+            <TargetFrameworks>net11.0;net48</TargetFrameworks>
+            <ImplicitUsings>disable</ImplicitUsings>
+            <Nullable>enable</Nullable>
+            <LangVersion>latest</LangVersion>
+          </PropertyGroup>
+        </Project>
+    assert:
+      - type: file_contains
+        path: "${data.csprojPath}"
+        value: "net11.0;net48"
+
+  - action: edit_file
+    name: Add "using System;" to Program.cs
+    with:
+      path: "${data.programCsPath}"
+      insertBefore: "Console."
+      text: "using System;\n"
+    assert:
+      - type: file_contains
+        path: "${data.programCsPath}"
+        value: "using System;"
+
+  - action: build
+    name: Build all target frameworks
+    with:
+      configuration: Debug
+    assert:
+      - type: build_succeeded
+      - type: stdout_contains
+        value: "Build succeeded"
+
+  - action: run
+    name: Run net11.0 target
+    with:
+      configuration: Debug
+      targetFramework: "net11.0"
+    assert:
+      - type: process_exit_code
+        equals: 0
+
+  - action: run
+    name: Run net48 target
+    with:
+      configuration: Debug
+      targetFramework: "net48"
+    assert:
+      - type: process_exit_code
+        equals: 0
+
+  - action: screenshot
+    name: Capture final IDE state after all targets ran
+    with:
+      label: tc14-final
+
+  - action: wait_for
+    name: AI advisory — confirm no error markers in Solution Explorer or Output
+    with:
+      seconds: 1
+    assert:
+      - type: ai_visual
+        advisory: true
+        prompt: >
+          Confirm that both net11.0 and net48 targets built and ran without error markers.
+          Check the Output window and Solution Explorer for any unexpected warnings or failures.
+          Flag anything suspicious as a bug candidate.

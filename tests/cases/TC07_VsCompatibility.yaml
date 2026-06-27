@@ -1,0 +1,80 @@
+id: TC07
+title: Visual Studio Compatibility Warning for .NET 11 Project
+priority: P2
+feature: Visual Studio Compatibility
+classification: Regression
+tags: [compatibility, warning, older-vs, net11]
+
+targets:
+  arch: [x64, arm64]
+  vs: ["17.0"]   # older Visual Studio version that does not ship .NET 11 support
+
+data:
+  workDir: "${WorkDir_Root}/TC07"
+  solutionPath: "${WorkDir_Root}/TC07/Tc07Net11Project/Tc07Net11Project.sln"
+  csprojPath: "${WorkDir_Root}/TC07/Tc07Net11Project/Tc07Net11Project.csproj"
+  expectedWarningText: "The current .NET SDK does not support targeting .NET 11"
+
+config:
+  onFailure: stop
+  timeoutSeconds: 600
+  retries: 0
+
+steps:
+  - action: replace_file
+    name: Prepare existing .NET 11 project file on disk (pre-condition)
+    with:
+      path: "${data.csprojPath}"
+      content: |
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <OutputType>Exe</OutputType>
+            <TargetFramework>net11.0</TargetFramework>
+            <Nullable>enable</Nullable>
+            <ImplicitUsings>enable</ImplicitUsings>
+          </PropertyGroup>
+        </Project>
+
+  - action: launch_vs
+    name: Launch the older Visual Studio version
+    with:
+      version: "${targets.vs[0]}"
+      cleanInstance: false
+
+  - action: open_solution
+    name: Open the .NET 11 project with the older VS
+    with:
+      path: "${data.solutionPath}"
+
+  - action: wait_for
+    name: Wait for compatibility warning dialog or info bar to appear
+    with:
+      seconds: 15
+    assert:
+      - type: ui_element_exists
+        locator: "compatibility warning"
+      - type: ai_visual
+        advisory: false
+        prompt: >
+          Confirm that Visual Studio has displayed a compatibility warning because
+          the opened project targets .NET 11, which this version of Visual Studio
+          does not fully support. The warning may appear as a dialog, info bar, or
+          Output window message. Report absence of any warning as a failure.
+
+  - action: screenshot
+    name: Capture compatibility warning
+    with:
+      label: tc07-compat-warning
+
+  - action: wait_for
+    name: AI advisory — verify warning content is actionable
+    with:
+      seconds: 1
+    assert:
+      - type: ai_visual
+        advisory: true
+        prompt: >
+          Read the compatibility warning text shown by Visual Studio.
+          Confirm it references .NET 11 or an unsupported SDK version
+          and provides guidance (e.g. upgrade VS or install SDK).
+          Flag if the warning text is missing, vague, or misleading.

@@ -1,0 +1,184 @@
+id: TC22
+title: Test Explorer Discovery, Run, Debug and Result Indicators
+priority: P0
+feature: Visual Studio Test Explorer
+classification: BVT
+tags: [test-explorer, xunit, nunit, mstest, discovery, debug, indicators]
+
+targets:
+  arch: [x64, arm64]
+  vs: ["18.0"]
+
+data:
+  workDir: "${WorkDir_Root}/TC22"
+  libProjectName: "Tc22ClassLib"
+  xunitProjectName: "Tc22XUnitTests"
+  nunitProjectName: "Tc22NUnitTests"
+  msTestProjectName: "Tc22MsTestTests"
+  solutionName: "Tc22TestExplorer"
+
+config:
+  onFailure: continue
+  timeoutSeconds: 1800
+  retries: 1
+
+steps:
+  - action: launch_vs
+    name: Launch Visual Studio
+    with:
+      version: "${targets.vs[0]}"
+      cleanInstance: true
+
+  - action: new_project
+    name: Create .NET Standard Class Library
+    with:
+      template: "Class Library"
+      name: "${data.libProjectName}"
+      location: "${data.workDir}"
+      targetFramework: "netstandard2.0"
+
+  - action: new_project
+    name: Add xUnit test project
+    with:
+      template: "xUnit Test Project"
+      name: "${data.xunitProjectName}"
+      location: "${data.workDir}"
+      addToSolution: true
+      addProjectReference: "${data.libProjectName}"
+
+  - action: new_project
+    name: Add NUnit test project
+    with:
+      template: "NUnit Test Project"
+      name: "${data.nunitProjectName}"
+      location: "${data.workDir}"
+      addToSolution: true
+      addProjectReference: "${data.libProjectName}"
+
+  - action: new_project
+    name: Add MSTest test project
+    with:
+      template: "MSTest Test Project"
+      name: "${data.msTestProjectName}"
+      location: "${data.workDir}"
+      addToSolution: true
+      addProjectReference: "${data.libProjectName}"
+
+  - action: edit_file
+    name: Add passing, failing and inconclusive xUnit tests
+    with:
+      path: "${data.workDir}/${data.xunitProjectName}/UnitTest1.cs"
+      content: |
+        using Xunit;
+        public class XUnitTests
+        {
+            [Fact] public void Passing() => Assert.True(true);
+            [Fact] public void Failing() => Assert.True(false);
+            [Fact(Skip = "inconclusive")] public void Skipped() { }
+        }
+
+  - action: edit_file
+    name: Add passing, failing and inconclusive NUnit tests
+    with:
+      path: "${data.workDir}/${data.nunitProjectName}/UnitTest1.cs"
+      content: |
+        using NUnit.Framework;
+        public class NUnitTests
+        {
+            [Test] public void Passing() => Assert.IsTrue(true);
+            [Test] public void Failing() => Assert.IsTrue(false);
+            [Test, Ignore("inconclusive")] public void Ignored() { }
+        }
+
+  - action: edit_file
+    name: Add passing, failing and inconclusive MSTest tests
+    with:
+      path: "${data.workDir}/${data.msTestProjectName}/UnitTest1.cs"
+      content: |
+        using Microsoft.VisualStudio.TestTools.UnitTesting;
+        [TestClass]
+        public class MsTests
+        {
+            [TestMethod] public void Passing() => Assert.IsTrue(true);
+            [TestMethod] public void Failing() => Assert.IsTrue(false);
+            [TestMethod, Ignore] public void Inconclusive() { }
+        }
+
+  - action: build
+    name: Build solution
+    with:
+      configuration: Debug
+    assert:
+      - type: build_succeeded
+
+  - action: open_test_explorer
+    name: Open Test Explorer
+    assert:
+      - type: ui_element_exists
+        locator: "Test Explorer"
+
+  - action: wait_for
+    name: Wait for test discovery to complete
+    with:
+      seconds: 15
+    assert:
+      - type: ai_visual
+        advisory: false
+        prompt: >
+          Confirm that Test Explorer has finished discovering tests and shows entries
+          for all three frameworks (xUnit, NUnit, MSTest). Report any framework with
+          zero discovered tests as a failure.
+
+  - action: run_tests
+    name: Run All tests
+    with:
+      scope: all
+    assert:
+      - type: ai_visual
+        advisory: false
+        prompt: >
+          After Run All completes, confirm that passing tests show a green check,
+          failing tests show a red X, and skipped/ignored tests show the appropriate
+          indicator. Report any missing or incorrect result icons as a bug.
+
+  - action: run_tests
+    name: Run Selected tests (passing tests only)
+    with:
+      scope: selected
+      filter: "Passing"
+    assert:
+      - type: ai_visual
+        advisory: false
+        prompt: >
+          Confirm that only the "Passing" tests were executed and all show a green check.
+
+  - action: run_tests
+    name: Debug a single failing test
+    with:
+      scope: selected
+      filter: "Failing"
+      mode: debug
+    assert:
+      - type: ai_visual
+        advisory: true
+        prompt: >
+          Confirm that the debugger attached successfully for the failing test.
+          Note whether the test stops at a breakpoint or runs to failure.
+
+  - action: screenshot
+    name: Capture Test Explorer result indicators
+    with:
+      label: tc22-test-explorer-results
+
+  - action: wait_for
+    name: AI advisory — verify all result indicators are correct
+    with:
+      seconds: 1
+    assert:
+      - type: ai_visual
+        advisory: true
+        prompt: >
+          Verify that Test Explorer displays: green check for passing tests,
+          red X for failing tests, and a skipped/ignored icon for inconclusive tests
+          across all three frameworks (xUnit, NUnit, MSTest).
+          Flag any missing or incorrect indicator as a bug candidate.
