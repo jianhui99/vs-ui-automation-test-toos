@@ -1,498 +1,206 @@
-# Design an AI-Powered UI Automation Testing Platform for Visual Studio
+# VsAuto — AI-Powered Visual Studio UI Automation
 
-I need to build an AI-powered UI automation testing platform for my company's QA team.
+VsAuto runs your repetitive Visual Studio UI test cases automatically. Test cases are
+written as **YAML** (no coding), executed against a real VS instance on Windows, validated
+against ground truth (the generated `.csproj`, the build log, process exit codes), and
+turned into **HTML + JSON reports** with screenshots and an AI-drafted bug summary when
+something fails.
 
-Please act as a Senior Software Architect with expertise in:
+- **What & why** → [PRD.md](PRD.md) (the original requirements)
+- **Architecture & design decisions** → [DESIGN.md](DESIGN.md)
+- **This file** → how to install and run it
 
-* Windows Desktop Automation
-* Visual Studio Automation
-* AI Agents
-* Microsoft .NET
-* QA Automation
-* Enterprise Software Architecture
-
-Do not simply follow my proposed solution if there is a better approach. Challenge my assumptions and recommend the most scalable, maintainable, and reliable architecture.
-
----
-
-# Background
-
-Our QA team currently performs the same manual UI test cases every day.
-
-These tests are repetitive, time-consuming, and require interacting with Microsoft Visual Studio on Windows.
-
-Because the test cases are executed daily across multiple environments, we want to automate as much of the process as possible.
-
-Instead of building a traditional automation framework that only executes scripts, I would like to explore whether AI can be used to improve flexibility, reduce maintenance costs, and assist with validation and bug reporting.
+> AI uses the **GitHub Copilot CLI** you already have — **no API keys required**.
 
 ---
 
-# Project Goal
+## Quick start (Windows company PC)
 
-Design a complete enterprise-grade automation platform that can:
+You've cloned the repo. Here's the whole path from zero to a report. Run these in
+**PowerShell** from the repo root.
 
-* Execute Visual Studio UI test cases automatically.
-* Interact with Visual Studio like a human tester.
-* Understand predefined test workflows.
-* Validate expected UI behaviors.
-* Detect failures.
-* Capture screenshots automatically.
-* Generate execution logs.
-* Produce test reports.
-* Record enough information for developers to reproduce issues.
-* Allow new test cases to be added easily.
+### 1. Install prerequisites
 
----
+| Tool | Needed for | Install |
+|---|---|---|
+| **.NET 10 SDK** | building & running VsAuto | `winget install Microsoft.DotNet.SDK.10` |
+| **Visual Studio** | the real VS automation (under test) | usually already installed on a QA box |
+| **GitHub Copilot CLI** | AI failure analysis / bug summaries | `npm install -g @github/copilot` then `copilot` once to sign in |
 
-# Existing Environment
+Check they're available:
 
-QA Team
+```powershell
+dotnet --version      # expect 10.x
+copilot --version     # optional; AI features use this
+```
 
-* Microsoft .NET project
-* Microsoft Visual Studio
-* Windows laptops
-* Manual testing every day
+> No Copilot and no API key? VsAuto still runs fully — it just skips the AI commentary and
+> relies on the deterministic checks. Nothing breaks.
 
-Target Testing Environments
+### 2. Build and sanity-check
 
-* Windows DevBox
-* Windows 11 25H2
-* Windows 11 24H2 ARM64
-* Windows Server 2022 ARM64
-* Windows Server 2025 ARM64
+```powershell
+dotnet build VsAuto.slnx
+dotnet test  VsAuto.slnx      # 11 unit tests should pass
+```
 
-Visual Studio is the primary application under test.
+### 3. Run a test case
 
-This is NOT web automation.
+VsAuto ships with one worked example, [TC11](tests/cases/TC11_SingleTfm.yaml) (create a
+console app → build → run → verify the Target Framework).
 
----
+**A) Against real Visual Studio** (the actual use case on your Windows box):
 
-# Current Problems
+```powershell
+dotnet run --project src\VsAuto.Cli -- run tests\cases\TC11_SingleTfm.yaml --driver windows --vs 18.0
+```
 
-Current testing process:
+> First-run note: the FlaUI **New-Project** UIA flow has version-specific automation IDs
+> that must be tuned to your VS image before real-IDE runs fully drive project creation
+> (build/run validation already use MSBuild ground truth). See
+> [WindowsVsDriver.cs](src/VsAuto.Driver.Windows/WindowsVsDriver.cs) `TODO`s. Use option B to
+> see a green run today.
 
-1. QA opens Visual Studio.
-2. Executes the same test cases manually.
-3. Verifies expected behavior.
-4. Takes screenshots if necessary.
-5. Creates bug reports manually.
-6. Repeats the same process every day.
+**B) Without driving the IDE** (fast smoke test — uses the `dotnet` CLI to simulate VS;
+works even on a box without VS):
 
-Problems:
+```powershell
+dotnet run --project src\VsAuto.Cli -- run tests\cases\TC11_SingleTfm.yaml --driver simulation
+```
 
-* Highly repetitive
-* Expensive
-* Slow
-* Human errors
-* Difficult to maintain
-* Difficult to scale
+On Windows the **default driver is `windows`**, so you can omit `--driver` for real runs.
 
----
+### 4. Read the result
 
-# Expected Workflow
+The run prints a summary and writes two reports:
 
-A typical automation flow should look like:
+```
+Result : Passed
+JSON   : reports\out\TC11.result.json     <- for CI / dashboards
+HTML   : reports\out\TC11.report.html     <- open this in a browser
+```
 
-1. QA selects one or more test cases.
-2. The automation engine launches Visual Studio.
-3. The automation engine executes every testing step.
-4. Validation is performed.
-5. If validation fails:
+Open the HTML report to see each step, its assertions, duration, screenshots, and (on
+failure) the AI analysis. If a step fails, a full reproduction bundle is saved under
+`artifacts\work\<TC>\<run>\evidence\` (failure screenshot, build log, a `failure-*.txt`
+descriptor with the failure classification).
 
-   * capture screenshots
-   * collect logs
-   * collect relevant files
-   * describe the failure
-   * continue or stop according to configuration
-6. Generate a final report.
+**Exit code:** `0` = passed, `1` = failed — wire this into CI to gate a build.
 
 ---
 
-# Test Case Characteristics
+## AI analysis via Copilot CLI (no API key)
 
-Most test cases involve one or more of the following actions:
+If `copilot` is on your PATH, VsAuto uses it automatically for failure root-cause and
+bug-summary drafting. Pick any model your Copilot subscription exposes:
 
-* Launch Visual Studio
-* Open an existing solution
-* Create a new project
-* Select project templates
-* Configure project options
-* Modify project files
-* Edit source code
-* Build projects
-* Run applications
-* Debug applications
-* Open Test Explorer
-* Execute unit tests
-* Verify dialogs
-* Verify warning messages
-* Verify Output Window
-* Verify Solution Explorer
-* Verify editor indicators
-* Verify project properties
-* Verify generated files
-* Compare expected vs actual behavior
+```powershell
+# Pin a model for this run:
+dotnet run --project src\VsAuto.Cli -- run tests\cases\TC11_SingleTfm.yaml --ai-model claude-opus-4.8
+dotnet run --project src\VsAuto.Cli -- run tests\cases\TC11_SingleTfm.yaml --ai-model gpt-5.5
 
-Some validations require reading project files.
+# Or set it once for the session:
+$env:VSAUTO_COPILOT_MODEL = "claude-opus-4.8"
+```
 
-Some validations require reading build output.
-
-Some validations require understanding Visual Studio UI.
+Use the model name exactly as Copilot lists it (check your Copilot model picker if a name
+is rejected). The Copilot CLI path is **text-based** (it analyzes the error, build output,
+and context — not the screenshot pixels); deterministic checks remain the source of truth
+either way.
 
 ---
 
-# Example Test Cases
+## Command reference
 
-## TC10
+```
+dotnet run --project src\VsAuto.Cli -- run <case.yaml> [options]
+```
 
-Feature
-
-Templates
-
-Title
-
-Template Default Target Framework via Visual Studio UI
-
-Priority
-
-P0
-
-Scenario
-
-* Launch Visual Studio
-* Create a new project
-* Select a project template
-* Verify the default Target Framework.
-
-Expected Result
-
-When creating a project for the first time in a Visual Studio instance, the default Target Framework should be the latest supported .NET LTS release.
-
-If the selected template does not support an LTS release, Visual Studio should select the highest supported non-preview framework instead.
+| Option | Meaning | Default |
+|---|---|---|
+| `--driver windows\|simulation` | Drive real VS (FlaUI) or simulate via dotnet CLI | `windows` on Windows |
+| `--ai auto\|copilot\|claude\|none` | AI backend | `auto` (Copilot if installed) |
+| `--ai-model <name>` | Model for Copilot CLI (e.g. `claude-opus-4.8`, `gpt-5.5`) | Copilot default |
+| `--vs <version>` | Visual Studio version hint for the windows driver | — |
+| `--work <dir>` | Working-dir root (bound to `${WorkDir_Root}` in cases) | `.\artifacts\work` |
+| `--out <dir>` | Report output folder | `.\reports\out` |
+| `--data key=value` | Override/add a case variable (repeatable) | — |
 
 ---
 
-## TC11
+## Add your own test case (no code)
 
-Feature
+Create a `.yaml` file in `tests\cases\`. Copy [TC11_SingleTfm.yaml](tests/cases/TC11_SingleTfm.yaml)
+and edit it — it's validated against [the schema](tests/cases/_schema/test-case.schema.json).
 
-Project Creation
+```yaml
+id: TC30
+title: My console app check
+priority: P1
+feature: Project Creation
+data:
+  projectName: MyApp
+  location: "${WorkDir_Root}/TC30"
+steps:
+  - action: launch_vs
+    with: { cleanInstance: true }
+  - action: new_project
+    with: { template: "Console App", name: "${data.projectName}", location: "${data.location}" }
+    assert:
+      - type: csproj_property
+        property: TargetFramework
+        equals: "net10.0"
+  - action: build
+    assert:
+      - type: build_succeeded
+  - action: run
+    assert:
+      - type: process_exit_code
+        equals: 0
+```
 
-Title
+Then:
 
-Single Target Framework Console Application
+```powershell
+dotnet run --project src\VsAuto.Cli -- run tests\cases\TC30.yaml
+```
 
-Priority
+**Implemented actions:** `launch_vs`, `new_project`, `build`, `run`, `screenshot`,
+`wait_for`. (The schema also reserves `open_solution`, `debug`, `open_test_explorer`,
+`edit_file`, etc. for upcoming phases — see [DESIGN.md](DESIGN.md) §11.)
+**Implemented assertions:** `csproj_property`, `build_succeeded`, `stdout_contains`,
+`process_exit_code`, `file_exists`, `file_contains`, `ai_visual` (advisory).
 
-P0
-
-Scenario
-
-* Create a .NET Console Application.
-* Build the project.
-* Run the application.
-* Detect the Target Framework.
-
-Expected Result
-
-* Build succeeds.
-* Application runs successfully.
-* The detected Target Framework is correctly reported in the test report.
-
-If the detected Target Framework appears incorrect, the automation should report it as a potential bug.
-
----
-
-## TC14
-
-Feature
-
-Multi Target Framework
-
-Title
-
-Multi-TFM Console Application
-
-Priority
-
-P0
-
-Scenario
-
-* Create a new .NET 11 Console project.
-* Modify the project file:
-
-<Project Sdk="Microsoft.NET.Sdk">
-<PropertyGroup>
-<OutputType>Exe</OutputType>
-<TargetFrameworks>net11.0;net48</TargetFrameworks>
-<ImplicitUsings>disable</ImplicitUsings>
-<Nullable>enable</Nullable>
-<LangVersion>latest</LangVersion>
-</PropertyGroup>
-</Project>
-
-* Add "using System;" to Program.cs.
-* Build and run every target framework.
-
-Expected Result
-
-* Build succeeds.
-* Every target framework executes successfully.
-* No unexpected errors occur.
+Need a new action? Add one `IStepHandler` class — the engine needs no changes (see
+[DESIGN.md](DESIGN.md) §6/§14).
 
 ---
 
-## TC22
+## Project layout
 
-Feature
-
-Visual Studio Test Explorer
-
-Title
-
-Test Explorer Discovery, Run, Debug and Result Indicators
-
-Priority
-
-P0
-
-Scenario
-
-* Create a .NET Standard Class Library.
-* Add a referenced test project.
-* Test all three frameworks:
-
-  * xUnit
-  * NUnit
-  * MSTest
-* Add passing, failing and inconclusive tests.
-* Verify Test Discovery.
-* Execute Run All.
-* Execute Run Selected.
-* Execute Debug.
-* Verify Test Indicators.
-
-Expected Result
-
-* Test Discovery works.
-* Run works.
-* Debug works.
-* Indicators appear correctly.
+```
+src\
+  VsAuto.Core/              models, interfaces, YAML loader, variable resolver
+  VsAuto.Engine/            step runner: lifecycle, retry, recovery, classification
+  VsAuto.Validators/        ground-truth assertions (csproj/build/file/exit/ai_visual)
+  VsAuto.Ai/                ILlmProvider: Copilot CLI (default), Claude, null
+  VsAuto.Reporting/         JSON + HTML reporters
+  VsAuto.Driver.Simulation/ cross-platform driver (dotnet CLI) — CI & no-VS boxes
+  VsAuto.Driver.Windows/    FlaUI/UIA3 driver — drives real Visual Studio
+  VsAuto.Cli/               the `vsauto run ...` entry point
+tests\
+  VsAuto.Tests/             unit tests
+  cases/                    YAML test cases + JSON schema
+```
 
 ---
 
-## TC21
-
-Feature
-
-Live Unit Testing
-
-Priority
-
-P1
-
-Scenario
-
-* Create a .NET Standard Class Library.
-* Create an xUnit project.
-* Enable Live Unit Testing.
-
-Expected Result
-
-Live Unit Testing works correctly.
-
----
-
-## TC07
-
-Feature
-
-Visual Studio Compatibility
-
-Priority
-
-P2
-
-Scenario
-
-Open an existing .NET 11 project using an older Visual Studio version.
-
-Expected Result
-
-Visual Studio displays the expected compatibility warning.
-
----
-
-## TC20
-
-Feature
-
-Debug Profiles
-
-Priority
-
-P2
-
-Scenario
-
-* Create a new Debug Profile.
-* Modify settings.
-* Verify launchSettings.json synchronization.
-
-Expected Result
-
-launchSettings.json reflects all changes made in Visual Studio.
-
----
-
-# Design Requirements
-
-Please design the complete system, including:
-
-## Architecture
-
-* High-level architecture
-* Components
-* Data flow
-* Execution flow
-
----
-
-## Technology Stack
-
-Recommend the most suitable technologies.
-
-Consider whether to use:
-
-* Windows UI Automation
-* WinAppDriver
-* Accessibility APIs
-* Computer Vision
-* OCR
-* MCP
-* LLM
-* AI Agents
-* PowerShell
-* Visual Studio automation APIs
-* Other Microsoft technologies
-
-Explain why each technology should or should not be used.
-
----
-
-## Test Case Definition
-
-How should test cases be represented?
-
-For example:
-
-* JSON
-* YAML
-* Markdown
-* Database
-* DSL
-
-The goal is to allow QA engineers to create new test cases without writing code whenever possible.
-
----
-
-## Automation Engine
-
-Design the execution engine.
-
-Explain:
-
-* Step execution
-* Validation
-* Retry
-* Error handling
-* Recovery
-* Parallel execution
-
----
-
-## AI Responsibilities
-
-Clearly explain where AI should be used.
-
-For example:
-
-* UI understanding
-* Bug description
-* Failure analysis
-* Screenshot analysis
-* Intelligent validation
-
-Also explain where AI should NOT be used.
-
----
-
-## Logging
-
-Design:
-
-* Execution logs
-* Screenshot management
-* Video recording
-* Build logs
-* Visual Studio logs
-* Error collection
-
----
-
-## Reporting
-
-Generate reports containing:
-
-* Passed tests
-* Failed tests
-* Duration
-* Environment
-* Screenshots
-* Failure reason
-* AI analysis
-* Suggested bug summary
-
----
-
-## Scalability
-
-The platform should support:
-
-* Hundreds of test cases
-* Multiple Visual Studio versions
-* Multiple Windows versions
-* Multiple .NET versions
-* Multiple QA engineers
-
----
-
-## Extensibility
-
-Future test cases should require minimal engineering effort.
-
-The system should allow new scenarios to be added without modifying the core automation engine whenever possible.
-
----
-
-# What I Want From You
-
-Please provide:
-
-1. Recommended architecture
-2. Architecture diagram
-3. Component responsibilities
-4. Technology comparison
-5. Folder structure
-6. Test case format
-7. Execution engine design
-8. AI workflow
-9. Logging strategy
-10. Reporting strategy
-11. Recommended implementation phases (MVP → Production)
-12. Risks and trade-offs
-13. Alternative approaches
-14. Best practices for enterprise adoption
-
-Do not limit your proposal to my initial ideas. Recommend the architecture that you believe is most appropriate for an enterprise-grade Visual Studio UI automation platform.
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `copilot --version` not found | AI is optional — runs continue without it. Install `@github/copilot` and run `copilot` once to sign in to enable AI. |
+| Copilot rejects `--ai-model` value | Use the exact model name from your Copilot model picker. |
+| `Could not locate devenv.exe` | The windows driver uses `vswhere`; pass `--vs <version>` or confirm VS is installed. |
+| New-Project step does nothing on real VS | The FlaUI New-Project UIA flow has version-specific automation IDs to tune on your VS image — see the `TODO` in [WindowsVsDriver.cs](src/VsAuto.Driver.Windows/WindowsVsDriver.cs). Use `--driver simulation` meanwhile. |
+| Want to verify without VS | Use `--driver simulation`. |

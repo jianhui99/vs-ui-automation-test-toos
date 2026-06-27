@@ -200,8 +200,24 @@ expected vs actual).
 - *Locator self-heal* — suggested replacement locator when the old one fails; **proposed,
   not auto-applied** (goes through human review — see §14).
 
-**Provider abstraction:** `ILlmProvider` with Claude and Azure OpenAI implementations,
-selectable per environment. Multimodal (image + text) is required.
+**Provider abstraction:** `ILlmProvider` with pluggable backends, selectable per run via
+`--ai`:
+
+- **Copilot CLI (default, recommended).** For QA teams that already use GitHub Copilot and
+  hold **no standalone provider API keys**: the `CopilotCliProvider` shells out to the
+  `copilot` CLI, which handles auth and routes to whichever model is selected
+  (`--ai-model claude-opus-4.8`, `gpt-5.5`, …). The prompt is piped over stdin and run
+  non-interactively (`-s --no-ask-user`, no tools granted). Because the Copilot CLI does not
+  document image input, this path is **text-first** (error + classification + build output +
+  UIA context) rather than screenshot-vision — which is consistent with ground-truth-first
+  validation. It is used for failure RCA and bug-summary drafting; `ai_visual` degrades to an
+  advisory text judgment.
+- **Claude API / Azure OpenAI (optional).** Direct multimodal providers when a team does
+  have keys and wants true screenshot-vision analysis. Activated by `ANTHROPIC_API_KEY`.
+
+Selection order for `--ai auto`: Copilot CLI if installed → Claude API key if present →
+null (deterministic-only). The null provider keeps everything reproducible when no AI is
+available — nothing fails on AI absence.
 
 **Guardrails / where AI must NOT be used:**
 - Not for deciding clicks in the deterministic suite (reproducibility).
@@ -319,9 +335,11 @@ dotnet run --project src/VsAuto.Cli -- run tests/cases/TC11_SingleTfm.yaml
 # → Failed (exit 1), classification ProductDefect, failure bundle under artifacts/work/TC11/<run>/evidence
 ```
 
-To run against real Visual Studio on Windows: `--driver windows --vs 18.0`. Set
-`ANTHROPIC_API_KEY` to activate the Claude AI provider for advisory visual checks and
-bug-summary drafting (otherwise the null provider keeps everything deterministic).
+To run against real Visual Studio on Windows: `--driver windows --vs 18.0`. AI analysis
+uses the **GitHub Copilot CLI by default** (no API key needed) — if `copilot` is on PATH it
+is used automatically; pin a model with `--ai-model claude-opus-4.8` (or `gpt-5.5`). A
+direct Claude provider is also available via `ANTHROPIC_API_KEY` for screenshot-vision.
+Without either, the null provider keeps everything deterministic.
 
 ## Verification checklist for this design pass
 

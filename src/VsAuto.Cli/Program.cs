@@ -24,6 +24,11 @@ if (parsed is null)
           --out <dir>                     Report output dir (default: ./reports/out)
           --data key=value                Override/append a case data variable (repeatable)
           --vs <version>                  Visual Studio version hint (windows driver)
+          --ai <auto|copilot|claude|none> AI backend (default: auto — Copilot CLI if installed)
+          --ai-model <name>               Model for Copilot CLI, e.g. claude-opus-4.8, gpt-5.5
+
+        AI uses the GitHub Copilot CLI by default (no API key needed). Pin a model with
+        --ai-model or the VSAUTO_COPILOT_MODEL env var.
         """);
     return 2;
 }
@@ -55,7 +60,7 @@ if (parsed.Data.Count > 0)
 }
 
 IVsDriver driver = SelectDriver(parsed.Driver);
-ILlmProvider llm = (ILlmProvider?)ClaudeLlmProvider.FromEnvironment() ?? new NullLlmProvider();
+ILlmProvider llm = SelectLlm(parsed.Ai, parsed.AiModel);
 
 Console.WriteLine($"Driver: {driver.Name} | AI: {llm.Name} | WorkDir_Root: {runDir}");
 
@@ -110,6 +115,33 @@ return result.Status == RunStatus.Failed ? 1 : 0;
 
 // ---- helpers ----
 
+// AI provider order (auto): Copilot CLI if installed (no API key needed) → Claude API key → none.
+static ILlmProvider SelectLlm(string? requested, string? model)
+{
+    var choice = requested?.ToLowerInvariant() ?? "auto";
+    switch (choice)
+    {
+        case "none":
+            return new NullLlmProvider();
+        case "copilot":
+            return (ILlmProvider?)CopilotCliProvider.FromEnvironment(model)
+                   ?? Warn("Copilot CLI not found on PATH; AI analysis disabled.");
+        case "claude":
+            return (ILlmProvider?)ClaudeLlmProvider.FromEnvironment()
+                   ?? Warn("ANTHROPIC_API_KEY not set; AI analysis disabled.");
+        default: // auto
+            return (ILlmProvider?)CopilotCliProvider.FromEnvironment(model)
+                   ?? (ILlmProvider?)ClaudeLlmProvider.FromEnvironment()
+                   ?? new NullLlmProvider();
+    }
+
+    static ILlmProvider Warn(string message)
+    {
+        Console.WriteLine($"WARN  {message}");
+        return new NullLlmProvider();
+    }
+}
+
 static IVsDriver SelectDriver(string? requested)
 {
     var choice = requested?.ToLowerInvariant()
@@ -142,6 +174,8 @@ internal sealed record CliArgs(
     string WorkDir,
     string OutDir,
     string? Vs,
+    string? Ai,
+    string? AiModel,
     IReadOnlyList<KeyValuePair<string, string>> Data)
 {
     public static CliArgs? Parse(string[] args)
@@ -150,7 +184,7 @@ internal sealed record CliArgs(
             return null;
 
         var caseFile = args[1];
-        string? driver = null, vs = null;
+        string? driver = null, vs = null, ai = null, aiModel = null;
         var workDir = "./artifacts/work";
         var outDir = "./reports/out";
         var data = new List<KeyValuePair<string, string>>();
@@ -163,6 +197,8 @@ internal sealed record CliArgs(
                 case "--work": workDir = Next(args, ref i); break;
                 case "--out": outDir = Next(args, ref i); break;
                 case "--vs": vs = Next(args, ref i); break;
+                case "--ai": ai = Next(args, ref i); break;
+                case "--ai-model": aiModel = Next(args, ref i); break;
                 case "--data":
                     var kv = Next(args, ref i);
                     var eq = kv.IndexOf('=');
@@ -172,7 +208,7 @@ internal sealed record CliArgs(
             }
         }
 
-        return new CliArgs(caseFile, driver, workDir, outDir, vs, data);
+        return new CliArgs(caseFile, driver, workDir, outDir, vs, ai, aiModel, data);
     }
 
     private static string Next(string[] args, ref int i)
