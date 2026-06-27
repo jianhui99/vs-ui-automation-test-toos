@@ -11,6 +11,10 @@ Test Data:
   Location = {WorkDir_Root}/TC11
   ExpectedTfm = {Tfm_Default}            # SDK under test
 
+Create a .Net console app. Build and run. Check what fx it is targeting. In the test results report, for this test case, please specify what fx the project is targeting. 
+
+If you feel the target fx does not seem right, please report it as a bug. 
+
 Expected Results:
   - VS launches and the New Project dialog opens
   - Console App project is created via the VS UI
