@@ -11,6 +11,9 @@ Test Data:
   Location = {WorkDir_Root}/TC20
   ProfileArg = "--env staging"            # sample command-line argument
 
+Create a console app, from project properties -> debug tab, Open debug launch profiles UI, click 'create a new profile' button and save 
+For this profile, there will be a launchSettings.json file created in the project. Any changes you make to the fields in the debug tab for this profile should be reflected in this json file. You should be able to build and run your project in this profile by providing the required values. 
+
 Expected Results:
   - A debug profile created/edited in the VS Project Properties > Debug UI is written to
     Properties/launchSettings.json
