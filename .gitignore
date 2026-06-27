@@ -1,0 +1,30 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+
+# .NET
+project.lock.json
+artifacts/
+*.nupkg
+
+# Test/automation runtime artifacts
+/artifacts/runs/
+/reports/out/
+*.trx
+*.log
+*.mp4
+screenshots/
+
+# Secrets / local config
+appsettings.local.json
+*.env
+.env
+
+# OS
+.DS_Store
+Thumbs.db

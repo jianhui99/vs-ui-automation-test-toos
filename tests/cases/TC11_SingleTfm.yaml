@@ -1,0 +1,78 @@
+# TC11 — Single Target Framework Console Application
+# Worked example of the YAML DSL. Validates against _schema/test-case.schema.json.
+id: TC11
+title: Single Target Framework Console Application
+priority: P0
+feature: Project Creation
+classification: BVT
+tags: [console, tfm, build, run]
+
+targets:
+  arch: [x64, arm64]
+  vs: ["18.0"]
+
+data:
+  workDir: "${WorkDir_Root}/TC11"
+  template: "Console App"
+  projectName: "Tc11ConsoleApp"
+  expectedTfm: "net11.0"   # policy: latest LTS for the SDK under test
+
+config:
+  onFailure: stop
+  timeoutSeconds: 900
+  retries: 1
+
+steps:
+  - action: launch_vs
+    name: Launch Visual Studio
+    with:
+      version: "${targets.vs[0]}"
+      cleanInstance: true        # fresh user hive so "first project" default TFM applies
+
+  - action: new_project
+    name: Create a .NET Console Application
+    with:
+      template: "${data.template}"
+      name: "${data.projectName}"
+      location: "${data.workDir}"
+    assert:
+      # Ground-truth assertion: read the generated csproj rather than scraping UI.
+      - type: csproj_property
+        project: "${data.workDir}/${data.projectName}/${data.projectName}.csproj"
+        property: TargetFramework
+        equals: "${data.expectedTfm}"
+
+  - action: build
+    name: Build the project
+    with:
+      configuration: Debug
+    assert:
+      - type: build_succeeded
+      # MSBuild log is the source of truth for detected TFM.
+      - type: stdout_contains
+        value: "Build succeeded"
+
+  - action: run
+    name: Run the application
+    with:
+      configuration: Debug
+    assert:
+      - type: process_exit_code
+        equals: 0
+
+  - action: screenshot
+    name: Capture final IDE state
+    with:
+      label: tc11-final
+
+  # AI vision is advisory only here — the deterministic csproj/build checks above are authoritative.
+  - action: wait_for
+    name: AI sanity check of IDE (advisory)
+    with:
+      seconds: 1
+    assert:
+      - type: ai_visual
+        advisory: true
+        prompt: >
+          Confirm the Solution Explorer shows a single console project that built
+          without error markers. Flag anything unexpected as a bug candidate.

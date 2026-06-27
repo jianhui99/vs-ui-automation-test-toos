@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vsauto.example/schemas/test-case.schema.json",
+  "title": "VS UI Automation Test Case",
+  "description": "Declarative test case authored by QA. Executed by the engine without code changes.",
+  "type": "object",
+  "required": ["id", "title", "priority", "feature", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^TC[0-9]{2,}$",
+      "description": "Stable test case id, e.g. TC11."
+    },
+    "title": { "type": "string", "minLength": 3 },
+    "priority": { "enum": ["P0", "P1", "P2", "P3"] },
+    "feature": { "type": "string" },
+    "classification": {
+      "type": "string",
+      "description": "Optional grouping, e.g. BVT, Smoke, Regression."
+    },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "targets": {
+      "type": "object",
+      "description": "Environment matrix this case may run on. Omit to allow all.",
+      "additionalProperties": false,
+      "properties": {
+        "os": { "type": "array", "items": { "type": "string" } },
+        "arch": { "type": "array", "items": { "enum": ["x64", "arm64"] } },
+        "vs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "data": {
+      "type": "object",
+      "description": "Free-form key/value test data referenced by steps via ${var}.",
+      "additionalProperties": true
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "onFailure": { "enum": ["stop", "continue"], "default": "stop" },
+        "timeoutSeconds": { "type": "integer", "minimum": 1, "default": 600 },
+        "retries": { "type": "integer", "minimum": 0, "default": 0 }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "step": {
+      "type": "object",
+      "required": ["action"],
+      "additionalProperties": true,
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "Action verb from the engine's step vocabulary.",
+          "examples": [
+            "launch_vs",
+            "open_solution",
+            "new_project",
+            "set_option",
+            "edit_file",
+            "replace_file",
+            "build",
+            "run",
+            "debug",
+            "open_test_explorer",
+            "run_tests",
+            "wait_for",
+            "screenshot"
+          ]
+        },
+        "name": { "type": "string", "description": "Human-friendly step label." },
+        "with": {
+          "type": "object",
+          "description": "Action-specific parameters.",
+          "additionalProperties": true
+        },
+        "retries": { "type": "integer", "minimum": 0 },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 },
+        "assert": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assertion" }
+        }
+      }
+    },
+    "assertion": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "enum": [
+            "file_contains",
+            "file_exists",
+            "csproj_property",
+            "build_succeeded",
+            "process_exit_code",
+            "stdout_contains",
+            "ui_element_exists",
+            "ui_text_equals",
+            "ai_visual"
+          ],
+          "description": "Prefer deterministic assertions; use ai_visual only when no ground truth exists."
+        },
+        "advisory": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true (typical for ai_visual), failure is reported but does not fail the run."
+        }
+      }
+    }
+  }
+}

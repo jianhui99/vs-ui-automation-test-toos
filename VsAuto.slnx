@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VsAuto.Ai/VsAuto.Ai.csproj" />
+    <Project Path="src/VsAuto.Cli/VsAuto.Cli.csproj" />
+    <Project Path="src/VsAuto.Core/VsAuto.Core.csproj" />
+    <Project Path="src/VsAuto.Driver.Simulation/VsAuto.Driver.Simulation.csproj" />
+    <Project Path="src/VsAuto.Driver.Windows/VsAuto.Driver.Windows.csproj" />
+    <Project Path="src/VsAuto.Engine/VsAuto.Engine.csproj" />
+    <Project Path="src/VsAuto.Reporting/VsAuto.Reporting.csproj" />
+    <Project Path="src/VsAuto.Validators/VsAuto.Validators.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VsAuto.Tests/VsAuto.Tests.csproj" />
+  </Folder>
+</Solution>
